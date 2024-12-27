@@ -3,7 +3,7 @@ const socket = io(); // Connect to the Socket.IO server
 // Store user locations and markers
 const markers = {};
 let userLocations = {};
-let userId = null;  // To keep track of the current user ID
+let userId = localStorage.getItem("userId") || null;  // Retrieve stored userId if it exists
 
 // Create map first with default position, then update when geolocation is available
 const map = L.map("map").setView([0, 0], 16); // Default to 0, 0 if no location is found yet
@@ -56,6 +56,26 @@ function fetchWeather(lat, lon) {
                 <p>Wind Speed: ${data.wind.speed} m/s</p>
                 <p>Humidity: ${data.main.humidity}%</p>
             `;
+            
+            // Create the close button
+            const closeButton = document.createElement('button');
+            closeButton.innerHTML = 'Close';
+            closeButton.style.position = 'absolute';
+            closeButton.style.top = '10px';
+            closeButton.style.right = '10px';
+            closeButton.style.backgroundColor = 'red';
+            closeButton.style.color = 'white';
+            closeButton.style.border = 'none';
+            closeButton.style.padding = '5px 10px';
+            closeButton.style.cursor = 'pointer';
+            
+            closeButton.addEventListener('click', () => {
+                weatherDiv.style.display = 'none'; // Hide the weather div when clicked
+            });
+
+            // Append close button to the weather div
+            weatherDiv.appendChild(closeButton);
+            
             weatherDiv.style.display = 'block'; // Show the weather div
         })
         .catch(error => {
@@ -65,11 +85,16 @@ function fetchWeather(lat, lon) {
 
 // Initialize geolocation and update map view and markers
 if (navigator.geolocation) {
+    if (!userId) {
+        // Generate a random userId if none exists
+        userId = Math.random().toString(36).substring(2, 9);
+        localStorage.setItem("userId", userId); // Store userId in localStorage
+    }
+
     navigator.geolocation.getCurrentPosition((position) => {
         const { latitude, longitude } = position.coords;
 
-        // Set userId and emit the location
-        userId = Math.random().toString(36).substring(2, 9);  // Generate a random user ID
+        // Emit the location to the server with userId
         socket.emit("send-location", { latitude, longitude, userId });
 
         // Center the map on user's location
@@ -172,3 +197,14 @@ setInterval(() => {
     }
 }, 5000);
 
+// Add a disconnection prompt after 1 minute
+setTimeout(() => {
+    const userChoice = confirm("Do you want to stay connected or disconnect?");
+    if (userChoice) {
+        // Stay connected
+        alert("You are staying connected.");
+    } else {
+        // Disconnect
+        socket.emit("disconnect"); // Emit disconnection to the server
+    }
+}, 60000);
